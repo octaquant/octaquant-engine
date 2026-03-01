@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from octaquant.api.schemas import EngineStatus, SignalRequest
 from octaquant.core.config import settings
@@ -17,6 +19,7 @@ app = FastAPI(title="OctaQuant")
 hub = MarketHub()
 strategy = ConfluenceStrategy()
 executor = TradeExecutor()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.on_event("startup")
@@ -34,6 +37,11 @@ async def status() -> EngineStatus:
         validation_days_required=settings.validation_days_required,
         monte_carlo_iterations=settings.monte_carlo_iterations,
     )
+
+
+@app.get("/")
+async def dashboard() -> RedirectResponse:
+    return RedirectResponse(url="/static/index.html")
 
 
 @app.post("/scan-and-trade")
