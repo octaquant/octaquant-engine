@@ -1,0 +1,40 @@
+# OctaQuant
+
+Python-based Multi-Market Trading Engine with FastAPI and WebSockets.
+
+## Features
+- **Data integration**
+  - DhanHQ for Indian indices (Nifty, BankNifty, Midcap, Sensex, Bankex)
+  - Delta Exchange for crypto
+  - Forex provider placeholder (MT5/OANDA)
+- **Confluence strategy**
+  - 26 EMA trend filter
+  - SMC order blocks, value gaps, retail trap detection
+  - Fibonacci 0.618/0.786 retracement zone entries
+  - Gamma Blast scanning for NSE option chain OI spikes and gamma shifts
+- **Risk management**
+  - 10,000-iteration Monte Carlo risk-of-ruin gate before trade placement
+  - RR enforcement between 1:2 and 1:10
+- **Execution controls**
+  - Default `PAPER_TRADING`
+  - Logs virtual trades to PostgreSQL/Supabase-compatible database
+  - 30-day validation gate before `LIVE_TRADING`
+- **Infra**
+  - FastAPI backend
+  - WebSocket endpoint for real-time heartbeat/streaming events
+
+## Run
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn octaquant.api.app:app --reload
+```
+
+## API
+- `GET /status`
+- `POST /scan-and-trade` with payload:
+```json
+{"market":"india|crypto|forex", "symbol":"NIFTY"}
+```
+- `WS /ws/market`
