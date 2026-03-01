@@ -38,3 +38,8 @@ uvicorn octaquant.api.app:app --reload
 {"market":"india|crypto|forex", "symbol":"NIFTY"}
 ```
 - `WS /ws/market`
+
+## Deployment
+- **Frontend (Vercel):** Deploy this repository as a static site and explicitly set **Output Directory** to `.` (dot) in the Vercel project settings to override framework presets.
+- **Backend (Render):** Deploy with the root `Procfile` command: `web: python -m uvicorn octaquant.api.app:app --host 0.0.0.0 --port $PORT`.
+- The Python backend source lives under `src/octaquant` so frontend hosting can remain independent from backend execution.
