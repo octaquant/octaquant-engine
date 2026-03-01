@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OctaQuant Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              dark: "#050505",
+              card: "#0f0f0f",
+              neon: "#39ff14",
+              muted: "#9ca3af",
+            },
+            boxShadow: {
+              neon: "0 0 18px rgba(57, 255, 20, 0.35)",
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="min-h-screen bg-dark text-white antialiased">
+    <main class="mx-auto max-w-7xl px-6 py-8 lg:px-10">
+      <header class="mb-8 flex flex-col gap-3 border-b border-neon/20 pb-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p class="text-sm uppercase tracking-[0.2em] text-neon">OctaQuant Engine</p>
+          <h1 class="text-3xl font-semibold">Live Strategy Validation Dashboard</h1>
+        </div>
+        <div class="rounded-lg border border-neon/30 bg-card px-4 py-2 text-sm shadow-neon">
+          WebSocket status: <span id="ws-status" class="font-semibold text-yellow-300">Connecting...</span>
+        </div>
+      </header>
+
+      <section class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" id="price-grid"></section>
+
+      <section class="mt-8 grid gap-6 lg:grid-cols-3">
+        <article class="rounded-xl border border-neon/20 bg-card p-5 shadow-neon lg:col-span-2">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Signal Log</h2>
+            <span class="text-xs text-muted">SMC + EMA 26 + Fibonacci</span>
+          </div>
+          <div id="signal-log" class="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
+            <p class="text-sm text-muted">Waiting for confluence signal...</p>
+          </div>
+        </article>
+
+        <article class="rounded-xl border border-neon/20 bg-card p-5 shadow-neon">
+          <h2 class="text-lg font-semibold">Paper Trading P&amp;L</h2>
+          <p class="mt-1 text-sm text-muted">30-day validation progress</p>
+
+          <div class="mt-6">
+            <p class="text-xs uppercase tracking-wider text-muted">Current P&amp;L</p>
+            <p id="pnl-value" class="mt-1 text-4xl font-bold text-neon">₹0.00</p>
+          </div>
+
+          <div class="mt-6 space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-muted">Days Completed</span>
+              <span id="days-completed" class="font-semibold">0 / 30</span>
+            </div>
+            <div class="h-2 w-full rounded-full bg-zinc-800">
+              <div id="progress-bar" class="h-2 rounded-full bg-neon transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div class="mt-6 rounded-lg border border-neon/20 bg-black/40 p-3 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-muted">Last Signal Outcome</span>
+              <span id="last-outcome" class="font-semibold text-muted">N/A</span>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const instruments = {
+        NIFTY: { price: 22450, drift: 10 },
+        BANKNIFTY: { price: 48200, drift: 18 },
+        BTC: { price: 62250, drift: 45 },
+        GOLD: { price: 2335, drift: 3.2 },
+      };
+
+      const state = {
+        pnl: 0,
+        days: 0,
+        signals: [],
+      };
+
+      const priceGrid = document.getElementById("price-grid");
+      const signalLog = document.getElementById("signal-log");
+      const wsStatus = document.getElementById("ws-status");
+      const pnlValue = document.getElementById("pnl-value");
+      const daysCompleted = document.getElementById("days-completed");
+      const progressBar = document.getElementById("progress-bar");
+      const lastOutcome = document.getElementById("last-outcome");
+
+      const cardMap = {};
+
+      function renderPriceCards() {
+        Object.entries(instruments).forEach(([symbol, details]) => {
+          const card = document.createElement("article");
+          card.className = "rounded-xl border border-neon/20 bg-card p-4 shadow-neon";
+          card.innerHTML = `
+            <p class="text-xs uppercase tracking-[0.18em] text-muted">${symbol}</p>
+            <p class="mt-2 text-2xl font-semibold" id="${symbol}-price">${details.price.toFixed(2)}</p>
+            <p class="mt-1 text-sm text-muted" id="${symbol}-change">+0.00%</p>
+          `;
+          priceGrid.appendChild(card);
+          cardMap[symbol] = {
+            priceEl: card.querySelector(`#${symbol}-price`),
+            changeEl: card.querySelector(`#${symbol}-change`),
+            base: details.price,
+          };
+        });
+      }
+
+      function updatePrice(symbol) {
+        const instrument = instruments[symbol];
+        const move = (Math.random() - 0.48) * instrument.drift;
+        instrument.price = Math.max(1, instrument.price + move);
+        const percent = ((instrument.price - cardMap[symbol].base) / cardMap[symbol].base) * 100;
+
+        cardMap[symbol].priceEl.textContent = instrument.price.toFixed(2);
+        cardMap[symbol].changeEl.textContent = `${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%`;
+        cardMap[symbol].changeEl.className = `mt-1 text-sm ${percent >= 0 ? "text-neon" : "text-red-400"}`;
+      }
+
+      function maybeGenerateSignal() {
+        if (Math.random() > 0.72) {
+          const symbols = Object.keys(instruments);
+          const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+          const side = Math.random() > 0.5 ? "BUY" : "SELL";
+          const rr = (1.8 + Math.random() * 1.7).toFixed(2);
+          const timestamp = new Date().toLocaleTimeString();
+          const outcome = Math.random() > 0.46 ? "WIN" : "LOSS";
+          const pnlMove = outcome === "WIN" ? 850 + Math.random() * 1000 : -(500 + Math.random() * 900);
+
+          state.pnl += pnlMove;
+          state.days = Math.min(30, state.days + 1);
+
+          const logEntry = {
+            symbol,
+            side,
+            rr,
+            timestamp,
+            outcome,
+            pnlMove,
+          };
+
+          state.signals.unshift(logEntry);
+          state.signals = state.signals.slice(0, 24);
+          renderSignals();
+          renderPnl();
+        }
+      }
+
+      function renderSignals() {
+        signalLog.innerHTML = "";
+        if (!state.signals.length) {
+          signalLog.innerHTML = '<p class="text-sm text-muted">Waiting for confluence signal...</p>';
+          return;
+        }
+
+        state.signals.forEach((signal) => {
+          const row = document.createElement("div");
+          row.className = "rounded-lg border border-neon/15 bg-black/40 p-3";
+          row.innerHTML = `
+            <div class="flex items-center justify-between text-sm">
+              <span class="font-medium text-white">${signal.symbol} · ${signal.side}</span>
+              <span class="text-xs text-muted">${signal.timestamp}</span>
+            </div>
+            <div class="mt-1 flex items-center justify-between text-sm">
+              <span class="text-muted">SMC + EMA26 + Fib aligned · RR ${signal.rr}</span>
+              <span class="font-semibold ${signal.outcome === "WIN" ? "text-neon" : "text-red-400"}">${signal.outcome}</span>
+            </div>
+          `;
+          signalLog.appendChild(row);
+        });
+      }
+
+      function renderPnl() {
+        const sign = state.pnl >= 0 ? "+" : "";
+        pnlValue.textContent = `${sign}₹${state.pnl.toFixed(2)}`;
+        pnlValue.className = `mt-1 text-4xl font-bold ${state.pnl >= 0 ? "text-neon" : "text-red-400"}`;
+        daysCompleted.textContent = `${state.days} / 30`;
+        progressBar.style.width = `${(state.days / 30) * 100}%`;
+        if (state.signals[0]) {
+          const last = state.signals[0];
+          lastOutcome.textContent = `${last.symbol} ${last.side} ${last.outcome} (${last.pnlMove >= 0 ? "+" : ""}₹${last.pnlMove.toFixed(0)})`;
+          lastOutcome.className = `font-semibold ${last.outcome === "WIN" ? "text-neon" : "text-red-400"}`;
+        }
+      }
+
+      function connectWebSocket() {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const socket = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
+
+        socket.onopen = () => {
+          wsStatus.textContent = "Connected";
+          wsStatus.className = "font-semibold text-neon";
+          socket.send("dashboard-subscriber");
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.event === "heartbeat") {
+              Object.keys(instruments).forEach(updatePrice);
+              maybeGenerateSignal();
+            }
+          } catch (_) {
+            // Keep UI resilient if non-JSON messages are received.
+          }
+        };
+
+        socket.onclose = () => {
+          wsStatus.textContent = "Reconnecting...";
+          wsStatus.className = "font-semibold text-yellow-300";
+          setTimeout(connectWebSocket, 1500);
+        };
+
+        socket.onerror = () => {
+          wsStatus.textContent = "Connection Issue";
+          wsStatus.className = "font-semibold text-red-400";
+          socket.close();
+        };
+      }
+
+      renderPriceCards();
+      renderSignals();
+      renderPnl();
+      connectWebSocket();
+    </script>
+  </body>
+</html>
