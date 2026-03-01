@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+dhanhq
+pandas
+numpy
+python-dotenv
+requests
+websockets
+supabase
