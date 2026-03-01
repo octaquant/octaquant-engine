@@ -4,6 +4,8 @@ import asyncio
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
+from octaquant.core.config import ExecutionMode
+
 from octaquant.api.schemas import EngineStatus, SignalRequest
 from octaquant.core.config import settings
 from octaquant.db.models import Base
@@ -18,12 +20,33 @@ hub = MarketHub()
 strategy = ConfluenceStrategy()
 executor = TradeExecutor()
 
+SCAN_TARGETS = [
+    ("india", "NIFTY", DhanHQClient),
+    ("india", "BANKNIFTY", DhanHQClient),
+    ("crypto", "BTCUSD", DeltaExchangeClient),
+    ("forex", "EURUSD", ForexClientPlaceholder),
+]
+
+
+async def run_startup_scans() -> None:
+    settings.execution_mode = ExecutionMode.PAPER_TRADING
+    while True:
+        for market, symbol, client_cls in SCAN_TARGETS:
+            client = client_cls()
+            option_chain = await client.fetch_option_chain(symbol) if market == "india" else None
+            candles = await client.fetch_candles(symbol)
+            signal = strategy.generate_signal(symbol, candles, option_chain)
+            if signal is not None:
+                await executor.execute(signal)
+        await asyncio.sleep(60)
+
 
 @app.on_event("startup")
 async def startup() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     asyncio.create_task(hub.heartbeat_loop())
+    asyncio.create_task(run_startup_scans())
 
 
 @app.get("/status", response_model=EngineStatus)
