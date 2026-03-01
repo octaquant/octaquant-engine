@@ -8,7 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from octaquant.core.config import ExecutionMode
 
-from octaquant.api.schemas import EngineStatus, SignalRequest
+from octaquant.api.schemas import (
+    EngineStatus,
+    PaperTradeRequest,
+    ProbabilityCurveResponse,
+    SignalRequest,
+    ValidationLockStatus,
+)
 from octaquant.core.config import settings
 from octaquant.db.models import Base
 from octaquant.db.session import engine
@@ -16,6 +22,7 @@ from octaquant.execution.service import TradeExecutor
 from octaquant.integrations.markets import DhanHQClient, DeltaExchangeClient, ForexClientPlaceholder
 from octaquant.streaming.market_hub import MarketHub
 from octaquant.strategy.confluence import ConfluenceStrategy
+from octaquant.strategy.models import SignalSide, TradeSignal
 
 app = FastAPI(title="OctaQuant")
 hub = MarketHub()
@@ -101,6 +108,55 @@ async def scan_and_trade(req: SignalRequest) -> dict:
             "confluences": signal.confluences,
         },
     }
+
+
+@app.post("/paper-trade")
+async def place_paper_trade(req: PaperTradeRequest) -> dict:
+    try:
+        quantity, risk_amount = executor.calculate_position_size(req.account_size, req.entry, req.stop_loss)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    side = req.side.upper()
+    if side not in {"BUY", "SELL"}:
+        raise HTTPException(status_code=422, detail="side must be BUY or SELL")
+
+    take_profit = req.take_profit
+    if take_profit is None:
+        move = abs(req.entry - req.stop_loss) * 2
+        take_profit = req.entry + move if side == "BUY" else req.entry - move
+
+    rr = abs(take_profit - req.entry) / abs(req.entry - req.stop_loss)
+    trade_signal = TradeSignal(
+        symbol=req.symbol,
+        side=SignalSide.BUY if side == "BUY" else SignalSide.SELL,
+        entry=req.entry,
+        stop_loss=req.stop_loss,
+        take_profit=take_profit,
+        rr=rr,
+        confluences=["paper-trade"],
+    )
+
+    decision = await executor.execute(trade_signal)
+    return {
+        "approved": decision.approved,
+        "reason": decision.reason,
+        "position_size": quantity,
+        "risk_amount": risk_amount,
+        "risk_percent": 1.0,
+    }
+
+
+@app.get("/monte-carlo/probability-curve", response_model=ProbabilityCurveResponse)
+async def monte_carlo_probability_curve() -> ProbabilityCurveResponse:
+    points = executor.probability_curve()
+    return ProbabilityCurveResponse(points=points)
+
+
+@app.get("/validation-lock", response_model=ValidationLockStatus)
+async def validation_lock() -> ValidationLockStatus:
+    pnl = await executor.thirty_day_pnl()
+    return ValidationLockStatus(thirty_day_pnl=pnl, restricted=pnl < 0)
 
 
 @app.websocket("/ws/market")

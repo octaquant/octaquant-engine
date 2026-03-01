@@ -157,7 +157,7 @@
 
       .signal-log {
         margin-top: 14px;
-        max-height: 370px;
+        max-height: 300px;
         overflow-y: auto;
         display: grid;
         gap: 10px;
@@ -264,6 +264,40 @@
         border: 1px solid rgba(50, 255, 126, 0.2);
       }
 
+      .action-button {
+        width: 100%;
+        margin-top: 12px;
+        font-weight: 600;
+      }
+
+      .badge {
+        margin-left: 8px;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 92, 92, 0.45);
+        background: rgba(255, 92, 92, 0.16);
+        color: #ffb4b4;
+      }
+
+      .probability-shell {
+        margin-top: 12px;
+      }
+
+      #probability-chart {
+        width: 100%;
+        height: 220px;
+        margin-top: 8px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(50, 255, 126, 0.2);
+      }
+
+      .tiny {
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
       button {
         border: 1px solid rgba(50, 255, 126, 0.32);
         background: rgba(50, 255, 126, 0.1);
@@ -294,6 +328,17 @@
       <section class="layout">
         <div class="main-stack">
           <section class="markets" id="price-grid"></section>
+
+          <article class="panel glass">
+            <div class="panel-header">
+              <h2 style="margin: 0">Monte Carlo Live View</h2>
+              <span style="color:var(--muted);font-size:0.78rem">Pre-signal probability curve</span>
+            </div>
+            <div class="probability-shell">
+              <div class="tiny" id="curve-status">Streaming latest simulations...</div>
+              <svg id="probability-chart" viewBox="0 0 700 220" preserveAspectRatio="none"></svg>
+            </div>
+          </article>
 
           <article class="panel glass">
             <div class="panel-header">
@@ -328,6 +373,10 @@
                 <span>Gamma Blast</span>
                 <input id="gamma-blast" type="checkbox" />
               </div>
+              <div class="switch-row">
+                <span>Live Mode <span id="restricted-badge" class="badge" style="display:none">Restricted</span></span>
+                <input id="live-mode" type="checkbox" />
+              </div>
             </div>
           </div>
 
@@ -335,6 +384,9 @@
             <div style="color:var(--muted);font-size:0.78rem">Current Paper P&amp;L</div>
             <div id="pnl-value" style="font-size:2rem;font-weight:800;margin-top:4px">₹0.00</div>
             <div style="margin-top:10px;color:var(--muted);font-size:0.82rem">Last Outcome: <span id="last-outcome">N/A</span></div>
+            <div style="margin-top:8px;color:var(--muted);font-size:0.82rem">30-day P&amp;L: <span id="rolling-pnl">₹0.00</span></div>
+            <button id="paper-trade-btn" class="action-button">Place Paper Trade</button>
+            <div class="tiny" id="paper-trade-feedback">Ready to size at 1% account risk.</div>
           </div>
         </aside>
       </section>
@@ -374,6 +426,13 @@
       const modalTitle = document.getElementById("modal-title");
       const chart = document.getElementById("chart");
       const closeModal = document.getElementById("close-modal");
+      const probabilityChart = document.getElementById("probability-chart");
+      const curveStatus = document.getElementById("curve-status");
+      const paperTradeBtn = document.getElementById("paper-trade-btn");
+      const paperTradeFeedback = document.getElementById("paper-trade-feedback");
+      const rollingPnl = document.getElementById("rolling-pnl");
+      const restrictedBadge = document.getElementById("restricted-badge");
+      const liveMode = document.getElementById("live-mode");
 
       const cardMap = {};
 
@@ -497,6 +556,100 @@
         if (event.target === chartModal) chartModal.classList.remove("open");
       });
 
+
+      async function refreshValidationLock() {
+        try {
+          const response = await fetch("/validation-lock");
+          if (!response.ok) return;
+          const lock = await response.json();
+          rollingPnl.textContent = `${lock.thirty_day_pnl >= 0 ? "+" : ""}₹${lock.thirty_day_pnl.toFixed(2)}`;
+          rollingPnl.className = lock.thirty_day_pnl >= 0 ? "up" : "down";
+
+          if (lock.restricted) {
+            restrictedBadge.style.display = "inline-block";
+            liveMode.checked = false;
+            liveMode.disabled = true;
+          } else {
+            restrictedBadge.style.display = "none";
+            liveMode.disabled = false;
+          }
+        } catch (_) {
+          // ignore temporary network failures
+        }
+      }
+
+      async function refreshProbabilityCurve() {
+        try {
+          const response = await fetch("/monte-carlo/probability-curve");
+          if (!response.ok) throw new Error("curve request failed");
+          const data = await response.json();
+          const points = (data.points || []).map((point) => ({
+            x: point.trade_number,
+            y: point.probability_of_profit,
+          }));
+
+          if (!points.length) return;
+
+          const poly = points
+            .map((point, index) => {
+              const x = (index / (points.length - 1 || 1)) * 700;
+              const y = 195 - point.y * 170;
+              return `${x},${y}`;
+            })
+            .join(" ");
+
+          probabilityChart.innerHTML = `
+            <polyline points="${poly}" fill="none" stroke="#32ff7e" stroke-width="3" stroke-linecap="round" />
+            <polyline points="${poly} 700,220 0,220" fill="rgba(50,255,126,0.12)" stroke="none" />
+          `;
+          curveStatus.textContent = `Updated ${new Date().toLocaleTimeString()} · Curve available pre-confirmation`;
+        } catch (_) {
+          curveStatus.textContent = "Probability feed retrying...";
+        }
+      }
+
+      async function placePaperTrade() {
+        const symbol = state.selectedSymbol;
+        const card = cardMap[symbol];
+        const entry = card?.lastPrice || instruments[symbol].price;
+        const stopDistance = Math.max(entry * 0.004, 1);
+        const payload = {
+          symbol,
+          side: "BUY",
+          entry,
+          stop_loss: Math.max(entry - stopDistance, 0.01),
+          account_size: 100000,
+        };
+
+        paperTradeFeedback.textContent = "Calculating 1% risk position...";
+        try {
+          const response = await fetch("/paper-trade", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.approved) {
+            paperTradeFeedback.textContent = `Paper trade blocked: ${result.reason || result.detail || "Unknown error"}`;
+            return;
+          }
+
+          paperTradeFeedback.textContent = `Placed ${symbol} paper trade · Size ${result.position_size} · Risk ₹${result.risk_amount.toFixed(2)}`;
+          updateSignalLog({
+            symbol,
+            side: "BUY",
+            time: new Date().toLocaleTimeString(),
+            reason: `Paper trade @1% risk · qty ${result.position_size}`,
+            outcome: "PLACED",
+            confluence: true,
+          });
+          refreshValidationLock();
+        } catch (_) {
+          paperTradeFeedback.textContent = "Unable to place paper trade right now.";
+        }
+      }
+
       function handlePayload(payload) {
         if (payload.event === "tick" && payload.symbol && typeof payload.price === "number" && instruments[payload.symbol]) {
           updatePrice(payload.symbol, payload.price);
@@ -599,7 +752,7 @@
         localStorage.setItem("OQ_TAKE_PROFIT", event.target.value);
       });
 
-      ["smc-mode", "gamma-blast"].forEach((id) => {
+      ["smc-mode", "gamma-blast", "live-mode"].forEach((id) => {
         const el = document.getElementById(id);
         const persisted = localStorage.getItem(`OQ_${id.toUpperCase().replace("-", "_")}`);
         if (persisted !== null) el.checked = persisted === "true";
@@ -608,9 +761,20 @@
         });
       });
 
+      paperTradeBtn.addEventListener("click", placePaperTrade);
+      liveMode.addEventListener("change", () => {
+        if (restrictedBadge.style.display !== "none" && liveMode.checked) {
+          liveMode.checked = false;
+        }
+      });
+
       renderPriceCards();
       connectWebSocket();
       demoSignalLoop();
+      refreshProbabilityCurve();
+      refreshValidationLock();
+      setInterval(refreshProbabilityCurve, 5000);
+      setInterval(refreshValidationLock, 10000);
     </script>
   </body>
 </html>

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import math
+import random
 
 from sqlalchemy import select, func
 
@@ -19,6 +21,49 @@ class ExecutionDecision:
 
 
 class TradeExecutor:
+    @staticmethod
+    def calculate_position_size(account_size: float, entry: float, stop_loss: float) -> tuple[float, float]:
+        risk_amount = account_size * 0.01
+        risk_per_unit = abs(entry - stop_loss)
+        if risk_per_unit <= 0:
+            raise ValueError("entry and stop_loss must be different for risk calculation")
+
+        quantity = math.floor((risk_amount / risk_per_unit) * 100) / 100
+        return quantity, risk_amount
+
+    async def thirty_day_pnl(self) -> float:
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        async with SessionLocal() as session:
+            query = select(TradeLog).where(TradeLog.created_at >= cutoff)
+            rows = (await session.execute(query)).scalars().all()
+
+        pnl = 0.0
+        for trade in rows:
+            direction = 1 if trade.side.upper() == "BUY" else -1
+            pnl += (trade.take_profit - trade.entry) * direction
+        return pnl
+
+    def probability_curve(self, points: int = 20, iterations_per_point: int = 600) -> list[dict[str, float | int]]:
+        curve: list[dict[str, float | int]] = []
+        for trade_count in range(1, points + 1):
+            profitable_paths = 0
+            for _ in range(iterations_per_point):
+                capital = 1.0
+                for _ in range(trade_count):
+                    if random.random() <= 0.45:
+                        capital *= 1.02
+                    else:
+                        capital *= 0.99
+                if capital > 1.0:
+                    profitable_paths += 1
+            curve.append(
+                {
+                    "trade_number": trade_count,
+                    "probability_of_profit": profitable_paths / iterations_per_point,
+                }
+            )
+        return curve
+
     async def can_switch_live(self) -> bool:
         cutoff = datetime.utcnow() - timedelta(days=settings.validation_days_required)
         async with SessionLocal() as session:
