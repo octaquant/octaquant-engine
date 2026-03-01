@@ -3,238 +3,614 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OctaQuant Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              dark: "#050505",
-              card: "#0f0f0f",
-              neon: "#39ff14",
-              muted: "#9ca3af",
-            },
-            boxShadow: {
-              neon: "0 0 18px rgba(57, 255, 20, 0.35)",
-            },
-          },
-        },
-      };
-    </script>
+    <title>OctaQuant Trading Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --obsidian: #050505;
+        --cyber-lime: #32ff7e;
+        --glass: rgba(11, 16, 14, 0.6);
+        --glass-border: rgba(50, 255, 126, 0.2);
+        --muted: #a7b0ab;
+        --danger: #ff5c5c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(circle at top right, rgba(50, 255, 126, 0.1), transparent 35%), var(--obsidian);
+        color: #f5fff9;
+        font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
+      }
+
+      .terminal {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .glass {
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        box-shadow: 0 0 0 1px rgba(50, 255, 126, 0.06), 0 14px 35px rgba(0, 0, 0, 0.35);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+        padding: 18px 20px;
+      }
+
+      .eyebrow {
+        letter-spacing: 0.22em;
+        color: var(--cyber-lime);
+        text-transform: uppercase;
+        font-size: 0.74rem;
+      }
+
+      h1 {
+        margin: 8px 0 0;
+        font-size: 1.8rem;
+      }
+
+      .ws-status {
+        font-size: 0.92rem;
+      }
+
+      .layout {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) 320px;
+      }
+
+      .main-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .markets {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      }
+
+      .market-card {
+        padding: 14px;
+        cursor: pointer;
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .market-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(50, 255, 126, 0.5);
+        box-shadow: 0 0 0 1px rgba(50, 255, 126, 0.2), 0 0 22px rgba(50, 255, 126, 0.16);
+      }
+
+      .market-symbol {
+        font-size: 0.78rem;
+        color: var(--muted);
+        letter-spacing: 0.18em;
+      }
+
+      .market-price {
+        margin-top: 8px;
+        font-size: 1.52rem;
+        font-weight: 700;
+      }
+
+      .market-change {
+        margin-top: 4px;
+        font-size: 0.9rem;
+      }
+
+      .up {
+        color: var(--cyber-lime);
+      }
+
+      .down {
+        color: var(--danger);
+      }
+
+      .flash-up,
+      .flash-down {
+        animation: flash 0.65s ease;
+      }
+
+      .flash-up {
+        text-shadow: 0 0 15px rgba(50, 255, 126, 0.8);
+      }
+
+      .flash-down {
+        text-shadow: 0 0 15px rgba(255, 92, 92, 0.8);
+      }
+
+      @keyframes flash {
+        0% { transform: scale(1); }
+        35% { transform: scale(1.04); }
+        100% { transform: scale(1); }
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .signal-log {
+        margin-top: 14px;
+        max-height: 370px;
+        overflow-y: auto;
+        display: grid;
+        gap: 10px;
+      }
+
+      .signal-row {
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(50, 255, 126, 0.18);
+        background: rgba(0, 0, 0, 0.35);
+      }
+
+      .pulse {
+        animation: pulseGlow 1.3s ease-out;
+      }
+
+      @keyframes pulseGlow {
+        0% { box-shadow: 0 0 0 rgba(50, 255, 126, 0); }
+        35% { box-shadow: 0 0 20px rgba(50, 255, 126, 0.45); }
+        100% { box-shadow: 0 0 0 rgba(50, 255, 126, 0); }
+      }
+
+      .risk-console {
+        padding: 18px;
+        position: sticky;
+        top: 16px;
+        height: fit-content;
+      }
+
+      .control {
+        margin-top: 14px;
+      }
+
+      .control label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin-bottom: 6px;
+      }
+
+      .control input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(50, 255, 126, 0.2);
+        color: white;
+        padding: 10px;
+        border-radius: 10px;
+      }
+
+      .switches {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .switch-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.92rem;
+      }
+
+      .switch-row input {
+        accent-color: var(--cyber-lime);
+        width: 18px;
+        height: 18px;
+      }
+
+      .pnl-row {
+        margin-top: 20px;
+        border-top: 1px solid rgba(50, 255, 126, 0.15);
+        padding-top: 14px;
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.75);
+        padding: 16px;
+      }
+
+      .modal.open { display: flex; }
+
+      .modal-card {
+        width: min(760px, 100%);
+        padding: 20px;
+      }
+
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      #chart {
+        width: 100%;
+        height: 240px;
+        margin-top: 14px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.32);
+        border: 1px solid rgba(50, 255, 126, 0.2);
+      }
+
+      button {
+        border: 1px solid rgba(50, 255, 126, 0.32);
+        background: rgba(50, 255, 126, 0.1);
+        color: #eafff3;
+        padding: 7px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+
+      @media (max-width: 1020px) {
+        .layout { grid-template-columns: 1fr; }
+        .risk-console { position: static; }
+      }
+    </style>
   </head>
-  <body class="min-h-screen bg-dark text-white antialiased">
-    <main class="mx-auto max-w-7xl px-6 py-8 lg:px-10">
-      <header class="mb-8 flex flex-col gap-3 border-b border-neon/20 pb-5 md:flex-row md:items-end md:justify-between">
+  <body>
+    <main class="terminal">
+      <header class="header glass">
         <div>
-          <p class="text-sm uppercase tracking-[0.2em] text-neon">OctaQuant Engine</p>
-          <h1 class="text-3xl font-semibold">Live Strategy Validation Dashboard</h1>
+          <div class="eyebrow">OctaQuant Engine</div>
+          <h1>World-Class Trading Terminal</h1>
         </div>
-        <div class="rounded-lg border border-neon/30 bg-card px-4 py-2 text-sm shadow-neon">
-          WebSocket status: <span id="ws-status" class="font-semibold text-yellow-300">Connecting...</span>
+        <div class="ws-status">
+          Network: <strong id="ws-status" style="color:#fbbf24">Booting feed...</strong>
         </div>
       </header>
 
-      <section class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" id="price-grid"></section>
+      <section class="layout">
+        <div class="main-stack">
+          <section class="markets" id="price-grid"></section>
 
-      <section class="mt-8 grid gap-6 lg:grid-cols-3">
-        <article class="rounded-xl border border-neon/20 bg-card p-5 shadow-neon lg:col-span-2">
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Signal Log</h2>
-            <span class="text-xs text-muted">SMC + EMA 26 + Fibonacci</span>
-          </div>
-          <div id="signal-log" class="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
-            <p class="text-sm text-muted">Waiting for confluence signal...</p>
-          </div>
-        </article>
-
-        <article class="rounded-xl border border-neon/20 bg-card p-5 shadow-neon">
-          <h2 class="text-lg font-semibold">Paper Trading P&amp;L</h2>
-          <p class="mt-1 text-sm text-muted">30-day validation progress</p>
-
-          <div class="mt-6">
-            <p class="text-xs uppercase tracking-wider text-muted">Current P&amp;L</p>
-            <p id="pnl-value" class="mt-1 text-4xl font-bold text-neon">₹0.00</p>
-          </div>
-
-          <div class="mt-6 space-y-2 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Days Completed</span>
-              <span id="days-completed" class="font-semibold">0 / 30</span>
+          <article class="panel glass">
+            <div class="panel-header">
+              <h2 style="margin: 0">Live Signal Log</h2>
+              <span style="color:var(--muted);font-size:0.78rem">Confluence Engine · SMC + EMA26 + Fib + Gamma</span>
             </div>
-            <div class="h-2 w-full rounded-full bg-zinc-800">
-              <div id="progress-bar" class="h-2 rounded-full bg-neon transition-all duration-500" style="width: 0%"></div>
+            <div class="signal-log" id="signal-log">
+              <div style="color:var(--muted)">Waiting for confluence signal...</div>
+            </div>
+          </article>
+        </div>
+
+        <aside class="risk-console glass">
+          <h2 style="margin:0">Risk Console</h2>
+          <div class="control">
+            <label for="stop-loss">Manual Stop-Loss (₹ / pts)</label>
+            <input id="stop-loss" type="number" placeholder="e.g. 45" />
+          </div>
+          <div class="control">
+            <label for="take-profit">Manual Take-Profit (₹ / pts)</label>
+            <input id="take-profit" type="number" placeholder="e.g. 95" />
+          </div>
+
+          <div class="control">
+            <label>Strategy Toggle</label>
+            <div class="switches">
+              <div class="switch-row">
+                <span>SMC Mode</span>
+                <input id="smc-mode" type="checkbox" checked />
+              </div>
+              <div class="switch-row">
+                <span>Gamma Blast</span>
+                <input id="gamma-blast" type="checkbox" />
+              </div>
             </div>
           </div>
 
-          <div class="mt-6 rounded-lg border border-neon/20 bg-black/40 p-3 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Last Signal Outcome</span>
-              <span id="last-outcome" class="font-semibold text-muted">N/A</span>
-            </div>
+          <div class="pnl-row">
+            <div style="color:var(--muted);font-size:0.78rem">Current Paper P&amp;L</div>
+            <div id="pnl-value" style="font-size:2rem;font-weight:800;margin-top:4px">₹0.00</div>
+            <div style="margin-top:10px;color:var(--muted);font-size:0.82rem">Last Outcome: <span id="last-outcome">N/A</span></div>
           </div>
-        </article>
+        </aside>
       </section>
     </main>
 
+    <div class="modal" id="chart-modal">
+      <div class="modal-card glass">
+        <div class="modal-head">
+          <h3 id="modal-title" style="margin:0">Instrument Detail</h3>
+          <button id="close-modal">Close</button>
+        </div>
+        <svg id="chart" viewBox="0 0 700 240" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
     <script>
       const instruments = {
-        NIFTY: { price: 22450, drift: 10 },
-        BANKNIFTY: { price: 48200, drift: 18 },
-        BTC: { price: 62250, drift: 45 },
+        NIFTY: { price: 22450, drift: 8 },
+        BANKNIFTY: { price: 48200, drift: 12 },
+        BTC: { price: 62250, drift: 40 },
         GOLD: { price: 2335, drift: 3.2 },
       };
 
       const state = {
         pnl: 0,
-        days: 0,
         signals: [],
+        selectedSymbol: "NIFTY",
+        feedHistory: {},
       };
 
       const priceGrid = document.getElementById("price-grid");
-      const signalLog = document.getElementById("signal-log");
       const wsStatus = document.getElementById("ws-status");
+      const signalLog = document.getElementById("signal-log");
       const pnlValue = document.getElementById("pnl-value");
-      const daysCompleted = document.getElementById("days-completed");
-      const progressBar = document.getElementById("progress-bar");
       const lastOutcome = document.getElementById("last-outcome");
+      const chartModal = document.getElementById("chart-modal");
+      const modalTitle = document.getElementById("modal-title");
+      const chart = document.getElementById("chart");
+      const closeModal = document.getElementById("close-modal");
 
       const cardMap = {};
 
+      Object.keys(instruments).forEach((symbol) => {
+        state.feedHistory[symbol] = Array.from({ length: 28 }, (_, i) => instruments[symbol].price + Math.sin(i / 3) * 6);
+      });
+
       function renderPriceCards() {
-        Object.entries(instruments).forEach(([symbol, details]) => {
+        Object.entries(instruments).forEach(([symbol, instrument]) => {
           const card = document.createElement("article");
-          card.className = "rounded-xl border border-neon/20 bg-card p-4 shadow-neon";
+          card.className = "market-card glass";
           card.innerHTML = `
-            <p class="text-xs uppercase tracking-[0.18em] text-muted">${symbol}</p>
-            <p class="mt-2 text-2xl font-semibold" id="${symbol}-price">${details.price.toFixed(2)}</p>
-            <p class="mt-1 text-sm text-muted" id="${symbol}-change">+0.00%</p>
+            <div class="market-symbol">${symbol}</div>
+            <div class="market-price" id="${symbol}-price">${instrument.price.toFixed(2)}</div>
+            <div class="market-change up" id="${symbol}-change">+0.00%</div>
           `;
+
+          card.addEventListener("click", () => {
+            state.selectedSymbol = symbol;
+            openMiniChart(symbol);
+          });
+
           priceGrid.appendChild(card);
           cardMap[symbol] = {
+            card,
             priceEl: card.querySelector(`#${symbol}-price`),
             changeEl: card.querySelector(`#${symbol}-change`),
-            base: details.price,
+            base: instrument.price,
+            lastPrice: instrument.price,
           };
         });
       }
 
-      function updatePrice(symbol) {
-        const instrument = instruments[symbol];
-        const move = (Math.random() - 0.48) * instrument.drift;
-        instrument.price = Math.max(1, instrument.price + move);
-        const percent = ((instrument.price - cardMap[symbol].base) / cardMap[symbol].base) * 100;
+      function updateSignalLog(signal) {
+        state.signals.unshift(signal);
+        state.signals = state.signals.slice(0, 22);
 
-        cardMap[symbol].priceEl.textContent = instrument.price.toFixed(2);
-        cardMap[symbol].changeEl.textContent = `${percent >= 0 ? "+" : ""}${percent.toFixed(2)}%`;
-        cardMap[symbol].changeEl.className = `mt-1 text-sm ${percent >= 0 ? "text-neon" : "text-red-400"}`;
-      }
-
-      function maybeGenerateSignal() {
-        if (Math.random() > 0.72) {
-          const symbols = Object.keys(instruments);
-          const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-          const side = Math.random() > 0.5 ? "BUY" : "SELL";
-          const rr = (1.8 + Math.random() * 1.7).toFixed(2);
-          const timestamp = new Date().toLocaleTimeString();
-          const outcome = Math.random() > 0.46 ? "WIN" : "LOSS";
-          const pnlMove = outcome === "WIN" ? 850 + Math.random() * 1000 : -(500 + Math.random() * 900);
-
-          state.pnl += pnlMove;
-          state.days = Math.min(30, state.days + 1);
-
-          const logEntry = {
-            symbol,
-            side,
-            rr,
-            timestamp,
-            outcome,
-            pnlMove,
-          };
-
-          state.signals.unshift(logEntry);
-          state.signals = state.signals.slice(0, 24);
-          renderSignals();
-          renderPnl();
-        }
-      }
-
-      function renderSignals() {
         signalLog.innerHTML = "";
-        if (!state.signals.length) {
-          signalLog.innerHTML = '<p class="text-sm text-muted">Waiting for confluence signal...</p>';
-          return;
-        }
-
-        state.signals.forEach((signal) => {
+        state.signals.forEach((item, idx) => {
           const row = document.createElement("div");
-          row.className = "rounded-lg border border-neon/15 bg-black/40 p-3";
+          row.className = "signal-row";
+          if (idx === 0 && item.confluence) row.classList.add("pulse");
           row.innerHTML = `
-            <div class="flex items-center justify-between text-sm">
-              <span class="font-medium text-white">${signal.symbol} · ${signal.side}</span>
-              <span class="text-xs text-muted">${signal.timestamp}</span>
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+              <strong>${item.symbol} · ${item.side}</strong>
+              <span style="font-size:0.78rem;color:var(--muted)">${item.time}</span>
             </div>
-            <div class="mt-1 flex items-center justify-between text-sm">
-              <span class="text-muted">SMC + EMA26 + Fib aligned · RR ${signal.rr}</span>
-              <span class="font-semibold ${signal.outcome === "WIN" ? "text-neon" : "text-red-400"}">${signal.outcome}</span>
+            <div style="margin-top:6px;display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:0.9rem">
+              <span style="color:var(--muted)">${item.reason}</span>
+              <strong class="${item.outcome === "WIN" ? "up" : "down"}">${item.outcome}</strong>
             </div>
           `;
           signalLog.appendChild(row);
         });
       }
 
-      function renderPnl() {
-        const sign = state.pnl >= 0 ? "+" : "";
-        pnlValue.textContent = `${sign}₹${state.pnl.toFixed(2)}`;
-        pnlValue.className = `mt-1 text-4xl font-bold ${state.pnl >= 0 ? "text-neon" : "text-red-400"}`;
-        daysCompleted.textContent = `${state.days} / 30`;
-        progressBar.style.width = `${(state.days / 30) * 100}%`;
-        if (state.signals[0]) {
-          const last = state.signals[0];
-          lastOutcome.textContent = `${last.symbol} ${last.side} ${last.outcome} (${last.pnlMove >= 0 ? "+" : ""}₹${last.pnlMove.toFixed(0)})`;
-          lastOutcome.className = `font-semibold ${last.outcome === "WIN" ? "text-neon" : "text-red-400"}`;
+      function updatePnl(move, label) {
+        state.pnl += move;
+        pnlValue.textContent = `${state.pnl >= 0 ? "+" : ""}₹${state.pnl.toFixed(2)}`;
+        pnlValue.className = state.pnl >= 0 ? "up" : "down";
+        lastOutcome.textContent = label;
+        lastOutcome.className = label.includes("WIN") ? "up" : "down";
+      }
+
+      function updatePrice(symbol, nextPrice) {
+        const ui = cardMap[symbol];
+        const current = instruments[symbol].price;
+        instruments[symbol].price = nextPrice;
+        const pct = ((nextPrice - ui.base) / ui.base) * 100;
+        const goingUp = nextPrice >= ui.lastPrice;
+
+        ui.priceEl.textContent = nextPrice.toFixed(2);
+        ui.priceEl.classList.remove("flash-up", "flash-down");
+        ui.priceEl.classList.add(goingUp ? "flash-up" : "flash-down");
+        ui.changeEl.textContent = `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
+        ui.changeEl.className = `market-change ${pct >= 0 ? "up" : "down"}`;
+        ui.lastPrice = nextPrice;
+
+        state.feedHistory[symbol].push(nextPrice);
+        if (state.feedHistory[symbol].length > 50) state.feedHistory[symbol].shift();
+
+        if (state.selectedSymbol === symbol && chartModal.classList.contains("open")) {
+          drawChart(symbol);
         }
       }
 
-      function connectWebSocket() {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const socket = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
-
-        socket.onopen = () => {
-          wsStatus.textContent = "Connected";
-          wsStatus.className = "font-semibold text-neon";
-          socket.send("dashboard-subscriber");
-        };
-
-        socket.onmessage = (event) => {
-          try {
-            const payload = JSON.parse(event.data);
-            if (payload.event === "heartbeat") {
-              Object.keys(instruments).forEach(updatePrice);
-              maybeGenerateSignal();
-            }
-          } catch (_) {
-            // Keep UI resilient if non-JSON messages are received.
-          }
-        };
-
-        socket.onclose = () => {
-          wsStatus.textContent = "Reconnecting...";
-          wsStatus.className = "font-semibold text-yellow-300";
-          setTimeout(connectWebSocket, 1500);
-        };
-
-        socket.onerror = () => {
-          wsStatus.textContent = "Connection Issue";
-          wsStatus.className = "font-semibold text-red-400";
-          socket.close();
-        };
+      function openMiniChart(symbol) {
+        modalTitle.textContent = `${symbol} · Micro Structure`;        
+        drawChart(symbol);
+        chartModal.classList.add("open");
       }
 
+      function drawChart(symbol) {
+        const series = state.feedHistory[symbol] || [];
+        const min = Math.min(...series);
+        const max = Math.max(...series);
+        const range = Math.max(max - min, 1);
+
+        const points = series
+          .map((value, i) => {
+            const x = (i / (series.length - 1 || 1)) * 700;
+            const y = 220 - ((value - min) / range) * 190;
+            return `${x},${y}`;
+          })
+          .join(" ");
+
+        chart.innerHTML = `
+          <defs>
+            <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#0ee86e" />
+              <stop offset="100%" stop-color="#75ffb0" />
+            </linearGradient>
+          </defs>
+          <polyline points="${points}" fill="none" stroke="url(#lineGradient)" stroke-width="3" stroke-linecap="round" />
+          <polyline points="${points} 700,240 0,240" fill="rgba(50,255,126,0.12)" stroke="none" />
+        `;
+      }
+
+      closeModal.addEventListener("click", () => chartModal.classList.remove("open"));
+      chartModal.addEventListener("click", (event) => {
+        if (event.target === chartModal) chartModal.classList.remove("open");
+      });
+
+      function handlePayload(payload) {
+        if (payload.event === "tick" && payload.symbol && typeof payload.price === "number" && instruments[payload.symbol]) {
+          updatePrice(payload.symbol, payload.price);
+          return;
+        }
+
+        if (payload.event === "signal") {
+          const signal = {
+            symbol: payload.symbol || "NIFTY",
+            side: payload.side || "BUY",
+            time: new Date().toLocaleTimeString(),
+            reason: payload.reason || "SMC confluence + gamma expansion",
+            outcome: payload.outcome || (Math.random() > 0.45 ? "WIN" : "LOSS"),
+            confluence: Boolean(payload.confluence ?? true),
+          };
+          updateSignalLog(signal);
+          const delta = signal.outcome === "WIN" ? 920 + Math.random() * 1000 : -(600 + Math.random() * 740);
+          updatePnl(delta, `${signal.symbol} ${signal.side} ${signal.outcome}`);
+          return;
+        }
+
+        if (payload.event === "heartbeat") {
+          Object.entries(instruments).forEach(([symbol, instrument]) => {
+            const move = (Math.random() - 0.49) * instrument.drift;
+            updatePrice(symbol, Math.max(1, instrument.price + move));
+          });
+        }
+      }
+
+      function resolveSocketUrls() {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const localUrl = `${protocol}://${window.location.host}/ws/market`;
+        const renderDefault = "wss://octaquant-engine.onrender.com/ws/market";
+        const configured = window.__OQ_WS_URL__ || localStorage.getItem("OQ_WS_URL");
+        return [configured, localUrl, renderDefault].filter(Boolean);
+      }
+
+      function connectWebSocket() {
+        const socketUrls = resolveSocketUrls();
+        let attempt = 0;
+        let activeSocket;
+
+        const tryConnect = () => {
+          const target = socketUrls[attempt % socketUrls.length];
+          wsStatus.textContent = `Connecting ${attempt + 1}...`;
+          wsStatus.style.color = "#fbbf24";
+
+          activeSocket = new WebSocket(target);
+
+          activeSocket.onopen = () => {
+            wsStatus.textContent = "Live · Connected";
+            wsStatus.style.color = "#32FF7E";
+            activeSocket.send(JSON.stringify({ role: "terminal", channel: "dashboard" }));
+          };
+
+          activeSocket.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              handlePayload(payload);
+            } catch (_) {
+              // ignore malformed packets
+            }
+          };
+
+          activeSocket.onerror = () => {
+            wsStatus.textContent = "Feed unstable · retrying";
+            wsStatus.style.color = "#ff7b7b";
+          };
+
+          activeSocket.onclose = () => {
+            attempt += 1;
+            wsStatus.textContent = `Reconnecting in 1.2s (route ${attempt + 1})`;
+            wsStatus.style.color = "#fbbf24";
+            setTimeout(tryConnect, 1200);
+          };
+        };
+
+        tryConnect();
+      }
+
+      function demoSignalLoop() {
+        setInterval(() => {
+          if (Math.random() > 0.72) {
+            const symbols = Object.keys(instruments);
+            handlePayload({
+              event: "signal",
+              symbol: symbols[Math.floor(Math.random() * symbols.length)],
+              side: Math.random() > 0.5 ? "BUY" : "SELL",
+              confluence: true,
+            });
+          }
+        }, 2600);
+      }
+
+      document.getElementById("stop-loss").addEventListener("input", (event) => {
+        localStorage.setItem("OQ_STOP_LOSS", event.target.value);
+      });
+
+      document.getElementById("take-profit").addEventListener("input", (event) => {
+        localStorage.setItem("OQ_TAKE_PROFIT", event.target.value);
+      });
+
+      ["smc-mode", "gamma-blast"].forEach((id) => {
+        const el = document.getElementById(id);
+        const persisted = localStorage.getItem(`OQ_${id.toUpperCase().replace("-", "_")}`);
+        if (persisted !== null) el.checked = persisted === "true";
+        el.addEventListener("change", () => {
+          localStorage.setItem(`OQ_${id.toUpperCase().replace("-", "_")}`, String(el.checked));
+        });
+      });
+
       renderPriceCards();
-      renderSignals();
-      renderPnl();
       connectWebSocket();
+      demoSignalLoop();
     </script>
   </body>
 </html>
